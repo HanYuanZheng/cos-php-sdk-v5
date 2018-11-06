@@ -4,14 +4,17 @@ namespace Qcloud\Cos;
 
 use Guzzle\Service\Description\Parameter;
 use Guzzle\Service\Description\ServiceDescription;
-use Guzzle\Service\Client as GSClient;
 use Guzzle\Common\Collection;
 use Guzzle\Http\EntityBody;
 use Guzzle\Http\Message\RequestInterface;
 use Qcloud\Cos\Signature;
 use Qcloud\Cos\TokenListener;
 
-class Client extends GSClient {
+use GuzzleHttp\Client as GSClient;
+use GuzzleHttp\Command\Guzzle\GuzzleClient as GZClient;
+use GuzzleHttp\Command\Guzzle\Description;
+
+class Client extends GZClient {
     const VERSION = '1.2.5';
 
     private $region;       // string: region.
@@ -49,15 +52,12 @@ class Client extends GSClient {
         $this->timeout = isset($config['timeout']) ? $config['timeout'] : 3600;
         $this->connect_timeout = isset($config['connect_timeout']) ? $config['connect_timeout'] : 3600;
         $this->signature = new signature($this->secretId, $this->secretKey);
-        parent::__construct(
-            'http://cos.' . $this->region . '.myqcloud.com/',    // base url
-            array('request.options' => array('timeout' => $this->timeout, 'connect_timeout' => $this->connect_timeout),
-            )); // show curl verbose or not
-
-        $desc = ServiceDescription::factory(Service::getService());
-        $this->setDescription($desc);
-        $this->setUserAgent('cos-php-sdk-v5.' . Client::VERSION, true);
-
+        $this->client = new GSClient(array(
+                'base_uri' => 'http://cos.' . $this->region . '.myqcloud.com/',
+                'timeout' => $this->timeout,
+                'headers' => array('User-Agent' => 'cos-php-sdk-v5.' . Client::VERSION)));
+        $desc = new Description(Service::getService());
+        parent::__construct($this->client, $desc);
         $this->addSubscriber(new ExceptionListener());
         $this->addSubscriber(new Md5Listener($this->signature));
         $this->addSubscriber(new TokenListener($this->token));
